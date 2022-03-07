@@ -94,6 +94,19 @@ clean:
 #this makefile.
 print-%  : ; @echo $* = $($*)
 
+
+target-burn:
+	@st-flash write $(OUTPUT_DIR)/$(IMAGE_BIN) 0x8000000
+
+target-debug:
+	@st-util
+	
+qemu-run:
+	qemu-system-arm -M netduinoplus2 -kernel $(OUTPUT_DIR)/$(IMAGE) -monitor none -nographic -serial /dev/null -serial stdio
+
+qemu-debug:
+	qemu-system-arm -M netduinoplus2 -kernel $(OUTPUT_DIR)/$(IMAGE) -monitor none -nographic -serial /dev/null -serial stdio -s -S
+
 .PHONY: all clean
 
 

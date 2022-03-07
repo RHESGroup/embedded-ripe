@@ -34,9 +34,9 @@
 #include <stdio.h>
 #include <string.h>
 
-/* 
- * printf() output uses the UART.  
- * These constants define the addresses of the required UART registers. 
+/*
+ * printf() output uses the UART.
+ * These constants define the addresses of the required UART registers.
  */
 #define UART0_ADDRESS (0x40004400UL)
 #define UART0_DATA (*(((volatile uint32_t *)(UART0_ADDRESS + 4UL))))
@@ -97,12 +97,8 @@ void main(void)
 	/* Hardware initialisation.  printf() output uses the UART for IO. */
 	prvUARTInit();
 
+	/* Print something just to check that everything works as expected */
 	printf("UART Initialized\r\n");
-	// while (1)
-	// {
-	// 	for (int i = 0; i < 100000; i++)
-	// 		;
-	// }
 
 	const TickType_t xTimerPeriod = mainTIMER_SEND_FREQUENCY_MS;
 
