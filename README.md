@@ -49,6 +49,16 @@ Target dependent or optional tools:
 - **QEMU** if you intend to execute the benchmark in a virtualized environment.
 - **GDB** if you want to debug your code. Note, you need the multi-architecture version or the one offered with ARM Toolchain.
 
+## Clone
+
+Clone this repository directly in the FreeRTOS demo folder
+
+```
+# starting from FreeRTOS root folder
+cd FreeRTOS/Demo
+git clone git@github.com:RHESGroup/embedded-ripe.git CORTEX_M4F_STM32_QEMU_GCC
+```
+
 ### Build
 
 Change into `build` folder and run the `make` command.
