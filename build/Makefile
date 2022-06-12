@@ -22,12 +22,15 @@ IMAGE_MAP := ripe.map
 # Target dependent variables
 #-----------------------------------------------------------------------------------------------------------------------
 
+qemu: BOARD_DIR = qemu
 qemu: LINKER_SCRIPT_NAME = stm32f4xx.ld
 qemu: STARTUP_SCRIPT_NAME = startup_gcc.c
 
+discovery: BOARD_DIR = discovery
 discovery: LINKER_SCRIPT_NAME = stm32f4xx.ld
 discovery: STARTUP_SCRIPT_NAME = startup_stm32f4.s
 
+nucleo: BOARD_DIR = nucleo
 nucleo: LINKER_SCRIPT_NAME = stm32f4xx.ld
 nucleo: STARTUP_SCRIPT_NAME = startup_stm32f4.s
 
@@ -40,33 +43,34 @@ LD = arm-none-eabi-gcc
 SIZE = arm-none-eabi-size
 OBJCP = arm-none-eabi-objcopy
 
-LINKER = ./../boards/$@/$(LINKER_SCRIPT_NAME)		# Specify the used linker script
+LINKER = ./../boards/$(BOARD_DIR)/$(LINKER_SCRIPT_NAME) # 	Specify the used linker script
 
-CFLAGS += $(INCLUDE_DIRS) 							# Specify include directories
-CFLAGS += -nostartfiles								# Do not use the standard system startup files
-CFLAGS += -ffreestanding							# Direct the compiler to not assumer std functions exists
-CFLAGS += -mthumb									# Generate thumb code
-CFLAGS += -mcpu=cortex-m4							# Specify the target processor name
-CFLAGS += -Wall -Wextra								# Enable all and extra warnings during compilation
-CFLAGS += -g3 -O0									# Enable maximum debug info and disable optimization
-CFLAGS += -ffunction-sections						# Generate a separate ELF section for each function
-CFLAGS += -fdata-sections							# Place each data item in a separate section
-CFLAGS += -mfloat-abi=softfp						# Allow use hw FPU but with soft ABI convention	
-CFLAGS += -mfpu=fpv4-sp-d16							# Specify the hw FPU available on target
-CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)" -MT $@			# Allow preprocessor to generate dependencies files
+CFLAGS += $(INCLUDE_DIRS) # 								Specify include directories
+CFLAGS += -nostartfiles	# 									Do not use the standard system startup files
+CFLAGS += -ffreestanding # 									Direct the compiler to not assumer std functions exists
+CFLAGS += -mthumb # 										Generate thumb code
+CFLAGS += -mcpu=cortex-m4 # 								Specify the target processor name
+CFLAGS += -Wall -Wextra	# 									Enable all and extra warnings during compilation
+CFLAGS += -g3 -O0 # 										Enable maximum debug info and disable optimization
+CFLAGS += -ffunction-sections # 							Generate a separate ELF section for each function
+CFLAGS += -fdata-sections # 								Place each data item in a separate section
+CFLAGS += -mfloat-abi=softfp # 								Allow use hw FPU but with soft ABI convention	
+CFLAGS += -mfpu=fpv4-sp-d16	# 								Specify the hw FPU available on target
+CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)" -MT $@	# 				Allow preprocessor to generate dependencies files
 
-LDFLAGS += -Xlinker --gc-sections					# Enable garbage collection of unused sections
-LDFLAGS += -Xlinker -T $(LINKER)					# Specify the linker script
-LDFLAGS += -Xlinker -Map=$(OUTPUT_DIR)/$(IMAGE_MAP)	# Generate a memory map after linking
-LDFLAGS += -specs=nano.specs						# Link with newlib-nano
-LDFLAGS += -specs=nosys.specs						# No syscall linking
-LDFLAGS += -specs=rdimon.specs						# Link with libgloss (low-level I/O support)
+LDFLAGS += -Xlinker --gc-sections # 						Enable garbage collection of unused sections
+LDFLAGS += -Xlinker -T $(LINKER) # 							Specify the linker script
+LDFLAGS += -Xlinker -Map=$(OUTPUT_DIR)/$(IMAGE_MAP) # 		Generate a memory map after linking
+LDFLAGS += -specs=nano.specs # 								Link with newlib-nano
+LDFLAGS += -specs=nosys.specs # 							No syscall linking
+LDFLAGS += -specs=rdimon.specs # 							Link with libgloss (low-level I/O support)
 
 #--------------------------------------------------- 
 # FreeRTOS kernel build
 #---------------------------------------------------
 
-FREERTOS_ROOT = ./../../../ 					# The directory that contains the /source and /demo sub directories.
+# The directory that contains the /source and /demo sub directories.
+FREERTOS_ROOT = ./../../..
 
 KERNEL_DIR = $(FREERTOS_ROOT)/Source
 KERNEL_PORT_DIR += $(KERNEL_DIR)/portable/GCC/ARM_CM4F
@@ -109,14 +113,12 @@ SOURCE_FILES += $(COMMON_DEMO_FILES)/IntQueueTimer.c
 DEMO_PROJECT = $(DEMO_ROOT)/CORTEX_M4F_STM32_QEMU_GCC
 
 VPATH += $(DEMO_PROJECT)
-VPATH += $(DEMO_PROJECT)/boards/$@
 
 INCLUDE_DIRS += -I$(DEMO_PROJECT)
 INCLUDE_DIRS += -I$(DEMO_PROJECT)/CMSIS
-INCLUDE_DIRS += -I$(DEMO_PROJECT)/boards/$@
+INCLUDE_DIRS += -I$(DEMO_PROJECT)/boards/$(BOARD_DIR)
 
 SOURCE_FILES += $(DEMO_PROJECT)/main.c
-SOURCE_FILES += ./../boards/$@/$(STARTUP_SCRIPT_NAME)
 SOURCE_FILES += ./printf-stdarg.c
 
 #--------------------------------------------------- 
@@ -126,6 +128,7 @@ SOURCE_FILES += ./printf-stdarg.c
 OBJS = $(SOURCE_FILES:%.c=%.o)
 OBJS_NO_PATH = $(notdir $(OBJS))
 OBJS_OUTPUT = $(OBJS_NO_PATH:%.o=$(OUTPUT_DIR)/%.o)
+OBJS_OUTPUT += $(OUTPUT_DIR)/startup.o
 
 DEP_FILES := $(SOURCE_FILES:%.c=$(OUTPUT_DIR)/%.d)
 DEP_FILES_NO_PATH = $(notdir $(DEP_FILES))
@@ -140,16 +143,19 @@ all:
 
 %.o : %.c
 $(OUTPUT_DIR)/%.o : %.c $(OUTPUT_DIR)/%.d Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
+	@echo "[CC]" $<
+	@$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTPUT_DIR)/startup.o: $(DEMO_PROJECT)/boards/$(BOARD_DIR)/$(STARTUP_SCRIPT_NAME)
+	@echo "[CC]" $(DEMO_PROJECT)/boards/$(BOARD_DIR)/$(STARTUP_SCRIPT_NAME)
+	@$(CC) $(CFLAGS) -c $(DEMO_PROJECT)/boards/$(BOARD_DIR)/$(STARTUP_SCRIPT_NAME) -o $@
 
 $(OUTPUT_DIR)/$(IMAGE_ELF): $(LINKER) $(OBJS_OUTPUT) Makefile
-	@echo ""
-	@echo ""
-	@echo "--- Final linking ---"
-	@echo ""
-	$(LD) $(OBJS_OUTPUT) $(CFLAGS) $(LDFLAGS) -o $(OUTPUT_DIR)/$(IMAGE_ELF)
-	$(SIZE) $(OUTPUT_DIR)/$(IMAGE_ELF)	
-	$(OBJCP) -O binary $(OUTPUT_DIR)/$(IMAGE_ELF) $(OUTPUT_DIR)/$(IMAGE_BIN)
+	@for OB in $(OBJS_OUTPUT); do echo "[LD]" $$OB; done
+	@$(LD) $(OBJS_OUTPUT) $(CFLAGS) $(LDFLAGS) -o $(OUTPUT_DIR)/$(IMAGE_ELF)
+	@$(SIZE) $(OUTPUT_DIR)/$(IMAGE_ELF)	
+	@echo "[CP]" $(OUTPUT_DIR)/$(IMAGE_BIN)
+	@$(OBJCP) -O binary $(OUTPUT_DIR)/$(IMAGE_ELF) $(OUTPUT_DIR)/$(IMAGE_BIN)
 
 $(DEP_OUTPUT):
 include $(wildcard $(DEP_OUTPUT))
