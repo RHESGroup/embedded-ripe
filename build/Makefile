@@ -116,6 +116,7 @@ VPATH += $(DEMO_PROJECT)
 
 INCLUDE_DIRS += -I$(DEMO_PROJECT)
 INCLUDE_DIRS += -I$(DEMO_PROJECT)/CMSIS
+INCLUDE_DIRS += -I$(DEMO_PROJECT)/boards
 INCLUDE_DIRS += -I$(DEMO_PROJECT)/boards/$(BOARD_DIR)
 
 SOURCE_FILES += $(DEMO_PROJECT)/main.c
@@ -144,7 +145,7 @@ all:
 %.o : %.c
 $(OUTPUT_DIR)/%.o : %.c $(OUTPUT_DIR)/%.d Makefile
 	@echo "[CC]" $<
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) -DTARGET_BOARD=$(BOARD_DIR) -c $< -o $@
 
 $(OUTPUT_DIR)/startup.o: $(DEMO_PROJECT)/boards/$(BOARD_DIR)/$(STARTUP_SCRIPT_NAME)
 	@echo "[CC]" $(DEMO_PROJECT)/boards/$(BOARD_DIR)/$(STARTUP_SCRIPT_NAME)

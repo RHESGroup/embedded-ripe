@@ -31,8 +31,8 @@
 #include "IntQueueTimer.h"
 #include "IntQueue.h"
 
-/* Library includes. */
-#include "stm32f405xx.h" // TODO: Make parameter
+/* Include BSP */
+#include "boards.h"
 
 /* Timer frequencies are slightly offset so they nest. */
 #define tmrTIMER_2_FREQUENCY (2000UL)
