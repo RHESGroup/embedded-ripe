@@ -30,6 +30,7 @@
 #define UART0_ADDRESS 	( 0x40004400UL )
 #define UART0_DATA		( * ( ( ( volatile unsigned int * )( UART0_ADDRESS + 4UL ) ) ) )
 #define putchar(c)      UART0_DATA = c
+#define getchar(c)		*c = UART0_DATA
 
 static int tiny_print( char **out, const char *format, va_list args, unsigned int buflen );
 
