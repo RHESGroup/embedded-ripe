@@ -64,20 +64,14 @@ git clone git@github.com:RHESGroup/embedded-ripe.git CORTEX_M4F_STM32_QEMU_GCC
 Change into `build` folder and run the `make` command.
 
 ```
-cd build
-make
+cd CORTEX_M4F_STM32_QEMU_GCC/build
+make <target> # could be 'qemu' / 'nucleo' / 'discovery'
 ```
 
-Then, to flash the binary into the board you can execute
+Then, to flash the binary into the board (or load it into QEMU) you can execute
 
 ```
-make target-burn
-```
-
-If you want indeed to make QEMU start and execute the benchmark, run
-
-```
-make qemu-run
+make <target>-run
 ```
 
 ### Debug
@@ -89,7 +83,7 @@ Using GDB (the version provided by ARM toolchain or the multi architecture one),
 To debug the code on the hardware target, connect the board to the host machine and run
 
 ```
-make target-debug
+make <target>-debug
 ```
 
 The make target above launch the `st-util` binary (comes with `stlink` package) that it will connect to the board programmer and will act as a GDB-server. Then you can launch
@@ -139,37 +133,32 @@ This repository would not host any of the material for the previous projects. Un
 
 ### Individual test with attack parameters
 
-// TODO
+Currently, this version of supports the following attack parameters:
+- **Location** can be: `stack`, `bss` or `data`
+- **Target pointer** can be: `ret`, `funcptr` or `structfuncptr`
+- **Target function** can be: `strcpy`, `strncpy`, `memcpy`, `memmove` or `homebrew` (a loop-based equivalent version of memcpy)
+- **Attack code** can be `injected-svc`,`injected-svc-nop`, `reused-svc`
+
 #### Location
 
-// TODO
-
-#### Attack code
-
-// TODO
+The overflow location describes the memory section in which the target 
+buffer is located.
 
 #### Target Code Pointer
 
-// TODO
+The target code pointer represents the pointer exploited by the specific attack. It transfers the control flow to the appropriate offset to trigger the payload. 
+#### Target function
 
-#### Overflow Technique
+Em-RIPE uses 5 vulnerable functions as attack entry points. Such functions from allow to copy part of a string from a source buffer to a destination buffer. 
+#### Attack code
 
-// TODO
-
-#### Function
-
-// TODO
-### Full benchmark
-
-// TODO
-
-### Test results
-
-// TODO
-
+The attack code represents the payload that an intruder may want to get running through a buffer overflow exploit.
 ## License & Citation
 
-RIPE was originally released under the MIT licence. Subsequent modification and porting to other architectures were still released under the MIT license.
+RIPE was originally released under the [MIT licence](https://choosealicense.com/licenses/mit/). 
+
+Subsequent modification and porting to other architectures were still released under the MIT license.
+
 If you use, extend or build upon RIPE we kindly ask you to cite the original ACSAC paper in which RIPE is presented. Here's the BibTeX:
 
 ```
