@@ -103,9 +103,6 @@ INCLUDE_DIRS += -I$(DEMO_ROOT)/Common/include
 
 VPATH += $(COMMON_DEMO_FILES)
 
-SOURCE_FILES += $(COMMON_DEMO_FILES)/IntQueue.c
-SOURCE_FILES += $(COMMON_DEMO_FILES)/IntQueueTimer.c
-
 #--------------------------------------------------- 
 # Current demo (embedded-ripe) build
 #---------------------------------------------------
@@ -113,13 +110,16 @@ SOURCE_FILES += $(COMMON_DEMO_FILES)/IntQueueTimer.c
 DEMO_PROJECT = $(DEMO_ROOT)/CORTEX_M4F_STM32_QEMU_GCC
 
 VPATH += $(DEMO_PROJECT)
+VPATH += $(DEMO_PROJECT)/ripe
 
 INCLUDE_DIRS += -I$(DEMO_PROJECT)
 INCLUDE_DIRS += -I$(DEMO_PROJECT)/CMSIS
+INCLUDE_DIRS += -I$(DEMO_PROJECT)/ripe
 INCLUDE_DIRS += -I$(DEMO_PROJECT)/boards
 INCLUDE_DIRS += -I$(DEMO_PROJECT)/boards/$(BOARD_DIR)
 
 SOURCE_FILES += $(DEMO_PROJECT)/main.c
+SOURCE_FILES += $(DEMO_PROJECT)/ripe/ripe.c
 SOURCE_FILES += ./printf-stdarg.c
 
 #--------------------------------------------------- 

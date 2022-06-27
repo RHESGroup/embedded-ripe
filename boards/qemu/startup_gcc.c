@@ -43,12 +43,13 @@ typedef struct UART_t
     volatile uint32_t BAUDDIV;
 } UART_t;
 
+/* Customized interrupt handlers. */
+extern void SVC_Handler(void);
+
 /* FreeRTOS interrupt handlers. */
-extern void vPortSVCHandler(void);
+// extern void vPortSVCHandler(void);
 extern void xPortPendSVHandler(void);
 extern void xPortSysTickHandler(void);
-extern void TIMER2_Handler(void);
-extern void TIMER3_Handler(void);
 
 /* Exception handlers. */
 static void HardFault_Handler(void) __attribute__((naked));
@@ -72,7 +73,7 @@ const uint32_t *isr_vector[] __attribute__((section(".isr_vector"))) =
         0,                                // reserved
         0,                                // reserved
         0,                                // reserved   -6
-        (uint32_t *)&vPortSVCHandler,     // SVC_Handler              -5
+        (uint32_t *)&SVC_Handler,         // SVC_Handler              -5
         (uint32_t *)&Default_Handler,     // DebugMon_Handler         -4
         0,                                // reserved
         (uint32_t *)&xPortPendSVHandler,  // PendSV handler    -2
@@ -85,8 +86,8 @@ const uint32_t *isr_vector[] __attribute__((section(".isr_vector"))) =
         0,
         0,
         0,
-        (uint32_t *)TIMER2_Handler, // Timer 0
-        (uint32_t *)TIMER3_Handler, // Timer 1
+        0, // Timer 0
+        0, // Timer 1
         0,
         0,
         0,

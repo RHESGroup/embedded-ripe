@@ -27,12 +27,17 @@
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
 #include "task.h"
-#include "timers.h"
-#include "queue.h"
 
 /* Standard includes. */
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
+/* Local includes */
+#include "ripe.h"
+
+/* Macros */
+#define UNUSED_ARG(var) (var = var)
 
 /*
  * printf() output uses the UART.
@@ -52,43 +57,15 @@ static void prvUARTInit(void);
 
 /*-----------------------------------------------------------*/
 
-/* Priorities at which the tasks are created. */
-#define mainQUEUE_RECEIVE_TASK_PRIORITY (tskIDLE_PRIORITY + 2)
-#define mainQUEUE_SEND_TASK_PRIORITY (tskIDLE_PRIORITY + 1)
-
-/* The rate at which data is sent to the queue.  The times are converted from
-milliseconds to ticks using the pdMS_TO_TICKS() macro. */
-#define mainTASK_SEND_FREQUENCY_MS pdMS_TO_TICKS(200UL)
-#define mainTIMER_SEND_FREQUENCY_MS pdMS_TO_TICKS(2000UL)
-
-/* The number of items the queue can hold at once. */
-#define mainQUEUE_LENGTH (2)
-
-/* The values sent to the queue receive task from the queue send task and the
-queue send software timer respectively. */
-#define mainVALUE_SENT_FROM_TASK (100UL)
-#define mainVALUE_SENT_FROM_TIMER (200UL)
+/* Priorities at which tasks are created. */
+#define mainUSER_ECHO_RECEIVE_TASK_PRIORITY (tskIDLE_PRIORITY + 1)
 
 /*-----------------------------------------------------------*/
 
 /*
- * The tasks as described in the comments at the top of this file.
+ * Tasks as described in the comments at the top of this file.
  */
-static void prvQueueReceiveTask(void *pvParameters);
-static void prvQueueSendTask(void *pvParameters);
-
-/*
- * The callback function executed when the software timer expires.
- */
-static void prvQueueSendTimerCallback(TimerHandle_t xTimerHandle);
-
-/*-----------------------------------------------------------*/
-
-/* The queue used by both tasks. */
-static QueueHandle_t xQueue = NULL;
-
-/* A software timer that is started from the tick hook. */
-static TimerHandle_t xTimer = NULL;
+static void vUserEchoReceivedCommandTask(void *parameters);
 
 /*-----------------------------------------------------------*/
 
@@ -100,43 +77,19 @@ void main(void)
 	/* Print something just to check that everything works as expected */
 	printf("UART Initialized\r\n");
 
-	const TickType_t xTimerPeriod = mainTIMER_SEND_FREQUENCY_MS;
+	/* Create echo receiver task */
+	xTaskCreate(vUserEchoReceivedCommandTask,		 /* The function that implements the task. */
+				"Echo Received Command Task",		 /* The text name assigned to the task - for debug only as it is not used by the kernel. */
+				configMINIMAL_STACK_SIZE,			 /* The size of the stack to allocate to the task. */
+				NULL,								 /* The parameter passed to the task - not used in this case. */
+				mainUSER_ECHO_RECEIVE_TASK_PRIORITY, /* The priority assigned to the task. */
+				NULL);								 /* The task handle is not required, so NULL is passed. */
 
-	/* Create the queue. */
-	xQueue = xQueueCreate(mainQUEUE_LENGTH, sizeof(uint32_t));
-
-	if (xQueue != NULL)
-	{
-		/* Start the two tasks as described in the comments at the top of this
-		file. */
-		xTaskCreate(prvQueueReceiveTask,			 /* The function that implements the task. */
-					"Rx",							 /* The text name assigned to the task - for debug only as it is not used by the kernel. */
-					configMINIMAL_STACK_SIZE,		 /* The size of the stack to allocate to the task. */
-					NULL,							 /* The parameter passed to the task - not used in this simple case. */
-					mainQUEUE_RECEIVE_TASK_PRIORITY, /* The priority assigned to the task. */
-					NULL);							 /* The task handle is not required, so NULL is passed. */
-
-		xTaskCreate(prvQueueSendTask, "TX", configMINIMAL_STACK_SIZE, NULL, mainQUEUE_SEND_TASK_PRIORITY, NULL);
-
-		/* Create the software timer, but don't start it yet. */
-		xTimer = xTimerCreate("Timer",					  /* The text name assigned to the software timer - for debug only as it is not used by the kernel. */
-							  xTimerPeriod,				  /* The period of the software timer in ticks. */
-							  pdTRUE,					  /* xAutoReload is set to pdTRUE, so this is an auto-reload timer. */
-							  NULL,						  /* The timer's ID is not used. */
-							  prvQueueSendTimerCallback); /* The function executed when the timer expires. */
-
-		xTimerStart(xTimer, 0); /* The scheduler has not started so use a block time of 0. */
-
-		/* Start the tasks and timer running. */
-		vTaskStartScheduler();
-	}
+	/* Start the tasks. */
+	vTaskStartScheduler();
 
 	/* If all is well, the scheduler will now be running, and the following
-	line will never be reached.  If the following line does execute, then
-	there was insufficient FreeRTOS heap memory available for the idle and/or
-	timer tasks	to be created.  See the memory management section on the
-	FreeRTOS web site for more details.  NOTE: This demo uses static allocation
-	for the idle and timer tasks so this line should never execute. */
+	line will never be reached. */
 	for (;;)
 		;
 }
@@ -144,124 +97,56 @@ void main(void)
 
 /*-----------------------------------------------------------*/
 
-static void prvQueueSendTask(void *pvParameters)
+#define SERIAL_BUFFER_LEN 50
+uint8_t serial_buffer[SERIAL_BUFFER_LEN] = {0};
+
+static void vUserEchoReceivedCommandTask(void *parameters)
 {
-	TickType_t xNextWakeTime;
-	const TickType_t xBlockTime = mainTASK_SEND_FREQUENCY_MS;
-	const uint32_t ulValueToSend = mainVALUE_SENT_FROM_TASK;
+	char attack_code[4];
+	struct param_t attack_params;
 
-	/* Prevent the compiler warning about the unused parameter. */
-	(void)pvParameters;
+	UNUSED_ARG(parameters);
 
-	/* Initialise xNextWakeTime - this only needs to be done once. */
-	xNextWakeTime = xTaskGetTickCount();
+	printf("DEVICE->ONLINE");
+	scanf("%s", serial_buffer);
 
-	for (;;)
+	if (strncmp("HOST->", (const char *)serial_buffer, 6) != 0)
 	{
-		/* Place this task in the blocked state until it is time to run again.
-		The block time is specified in ticks, pdMS_TO_TICKS() was used to
-		convert a time specified in milliseconds into a time specified in ticks.
-		While in the Blocked state this task will not consume any CPU time. */
-		vTaskDelayUntil(&xNextWakeTime, xBlockTime);
-
-		/* Send to the queue - causing the queue receive task to unblock and
-		write to the console.  0 is used as the block time so the send operation
-		will not block - it shouldn't need to block as the queue should always
-		have at least one space at this point in the code. */
-		xQueueSend(xQueue, &ulValueToSend, 0U);
+		printf("DEVICE->ERROR");
+		// maybe reset?
 	}
-}
-/*-----------------------------------------------------------*/
 
-static void prvQueueSendTimerCallback(TimerHandle_t xTimerHandle)
+	strncpy(attack_code, (const char *)(serial_buffer + 6), 4);
+	number_to_attack_params(atoi(attack_code), &attack_params);
+
+	// if the attack is not possible, send a nope
+
+	if (!attack_possible(&attack_params))
+		printf("DEVICE->NOPE");
+	else
+		attack(&attack_params);
+
+	printf("DEVICE->DONE");
+}
+
+void SVC_Handler(void)
 {
-	const uint32_t ulValueToSend = mainVALUE_SENT_FROM_TIMER;
-
-	/* This is the software timer callback function.  The software timer has a
-	period of two seconds and is reset each time a key is pressed.  This
-	callback function will execute if the timer expires, which will only happen
-	if a key is not pressed for two seconds. */
-
-	/* Avoid compiler warnings resulting from the unused parameter. */
-	(void)xTimerHandle;
-
-	/* Send to the queue - causing the queue receive task to unblock and
-	write out a message.  This function is called from the timer/daemon task, so
-	must not block.  Hence the block time is set to 0. */
-	xQueueSend(xQueue, &ulValueToSend, 0U);
-}
-/*-----------------------------------------------------------*/
-
-static void prvQueueReceiveTask(void *pvParameters)
-{
-	uint32_t ulReceivedValue;
-
-	/* Prevent the compiler warning about the unused parameter. */
-	(void)pvParameters;
-
-	for (;;)
-	{
-		/* Wait until something arrives in the queue - this task will block
-		indefinitely provided INCLUDE_vTaskSuspend is set to 1 in
-		FreeRTOSConfig.h.  It will not use any CPU time while it is in the
-		Blocked state. */
-		xQueueReceive(xQueue, &ulReceivedValue, portMAX_DELAY);
-
-		/*  To get here something must have been received from the queue, but
-		is it an expected value? */
-		if (ulReceivedValue == mainVALUE_SENT_FROM_TASK)
-		{
-			/* It is normally not good to call printf() from an embedded system,
-			although it is ok in this simulated case. */
-			printf("Message received from task\r\n");
-		}
-		else if (ulReceivedValue == mainVALUE_SENT_FROM_TIMER)
-		{
-			printf("Message received from software timer\r\n");
-		}
-		else
-		{
-			printf("Unexpected message\r\n");
-		}
-	}
+	// __asm volatile(
+	// 	".align 8                   \n"
+	// 	" tst lr            		\n"
+	// 	" mrseq	r0, msp             \n"
+	// 	" mrsne	r0, psp             \n"
+	// 	" ldr		r0, [r0, #24]   \n"
+	// 	" ldrb	r0, [r0, #-2]       \n"
+	// 	" cmp	r0, #255            \n"
+	// 	" beq svc_end               \n"
+	// 	".svc_end                   \n"
+	// 	" beq svc_end               \n"
+	// 	" push {lr}                 \n"
+	// 	" blx r1                    \n"
+	// 	" pop {pc}                  \n");
 }
 
-/*-----------------------------------------------------------*/
-
-void vApplicationMallocFailedHook(void)
-{
-	/* vApplicationMallocFailedHook() will only be called if
-	configUSE_MALLOC_FAILED_HOOK is set to 1 in FreeRTOSConfig.h.  It is a hook
-	function that will get called if a call to pvPortMalloc() fails.
-	pvPortMalloc() is called internally by the kernel whenever a task, queue,
-	timer or semaphore is created using the dynamic allocation (as opposed to
-	static allocation) option.  It is also called by various parts of the
-	demo application.  If heap_1.c, heap_2.c or heap_4.c is being used, then the
-	size of the	heap available to pvPortMalloc() is defined by
-	configTOTAL_HEAP_SIZE in FreeRTOSConfig.h, and the xPortGetFreeHeapSize()
-	API function can be used to query the size of free heap space that remains
-	(although it does not provide information on how the remaining heap might be
-	fragmented).  See http://www.freertos.org/a00111.html for more
-	information. */
-	printf("\r\n\r\nMalloc failed\r\n");
-	portDISABLE_INTERRUPTS();
-	for (;;)
-		;
-}
-/*-----------------------------------------------------------*/
-
-void vApplicationIdleHook(void)
-{
-	/* vApplicationIdleHook() will only be called if configUSE_IDLE_HOOK is set
-	to 1 in FreeRTOSConfig.h.  It will be called on each iteration of the idle
-	task.  It is essential that code added to this hook function never attempts
-	to block in any way (for example, call xQueueReceive() with a block time
-	specified, or call vTaskDelay()).  If application tasks make use of the
-	vTaskDelete() API function to delete themselves then it is also important
-	that vApplicationIdleHook() is permitted to return to its calling function,
-	because it is the responsibility of the idle task to clean up memory
-	allocated by the kernel to any task that has since deleted itself. */
-}
 /*-----------------------------------------------------------*/
 
 void vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName)
@@ -272,29 +157,36 @@ void vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName)
 	/* Run time stack overflow checking is performed if
 	configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2.  This hook
 	function is called if a stack overflow is detected. */
+
 	printf("\r\n\r\nStack overflow in %s\r\n", pcTaskName);
 	portDISABLE_INTERRUPTS();
+
 	for (;;)
 		;
 }
-/*-----------------------------------------------------------*/
 
-void vApplicationTickHook(void)
+/* configUSE_STATIC_ALLOCATION is set to 1, so the application must provide an
+implementation of vApplicationGetIdleTaskMemory() to provide the memory that is
+used by the Idle task. */
+void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize)
 {
-	/* This function will be called by each tick interrupt if
-	configUSE_TICK_HOOK is set to 1 in FreeRTOSConfig.h.  User code can be
-	added here, but the tick hook is called from an interrupt context, so
-	code must not attempt to block, and only the interrupt safe FreeRTOS API
-	functions can be used (those that end in FromISR()). */
-}
-/*-----------------------------------------------------------*/
+	/* If the buffers to be provided to the Idle task are declared inside this
+function then they must be declared static - otherwise they will be allocated on
+the stack and so not exists after this function exits. */
+	static StaticTask_t xIdleTaskTCB;
+	static StackType_t uxIdleTaskStack[configMINIMAL_STACK_SIZE];
 
-void vApplicationDaemonTaskStartupHook(void)
-{
-	/* This function will be called once only, when the daemon task starts to
-	execute (sometimes called the timer task).  This is useful if the
-	application includes initialisation code that would benefit from executing
-	after the scheduler has been started. */
+	/* Pass out a pointer to the StaticTask_t structure in which the Idle task's
+	state will be stored. */
+	*ppxIdleTaskTCBBuffer = &xIdleTaskTCB;
+
+	/* Pass out the array that will be used as the Idle task's stack. */
+	*ppxIdleTaskStackBuffer = uxIdleTaskStack;
+
+	/* Pass out the size of the array pointed to by *ppxIdleTaskStackBuffer.
+	Note that, as the array is necessarily of type StackType_t,
+	configMINIMAL_STACK_SIZE is specified in words, not bytes. */
+	*pulIdleTaskStackSize = configMINIMAL_STACK_SIZE;
 }
 /*-----------------------------------------------------------*/
 
@@ -322,61 +214,12 @@ void vAssertCalled(const char *pcFileName, uint32_t ulLine)
 }
 /*-----------------------------------------------------------*/
 
-/* configUSE_STATIC_ALLOCATION is set to 1, so the application must provide an
-implementation of vApplicationGetIdleTaskMemory() to provide the memory that is
-used by the Idle task. */
-void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize)
-{
-	/* If the buffers to be provided to the Idle task are declared inside this
-function then they must be declared static - otherwise they will be allocated on
-the stack and so not exists after this function exits. */
-	static StaticTask_t xIdleTaskTCB;
-	static StackType_t uxIdleTaskStack[configMINIMAL_STACK_SIZE];
-
-	/* Pass out a pointer to the StaticTask_t structure in which the Idle task's
-	state will be stored. */
-	*ppxIdleTaskTCBBuffer = &xIdleTaskTCB;
-
-	/* Pass out the array that will be used as the Idle task's stack. */
-	*ppxIdleTaskStackBuffer = uxIdleTaskStack;
-
-	/* Pass out the size of the array pointed to by *ppxIdleTaskStackBuffer.
-	Note that, as the array is necessarily of type StackType_t,
-	configMINIMAL_STACK_SIZE is specified in words, not bytes. */
-	*pulIdleTaskStackSize = configMINIMAL_STACK_SIZE;
-}
-/*-----------------------------------------------------------*/
-
-/* configUSE_STATIC_ALLOCATION and configUSE_TIMERS are both set to 1, so the
-application must provide an implementation of vApplicationGetTimerTaskMemory()
-to provide the memory that is used by the Timer service task. */
-void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
-{
-	/* If the buffers to be provided to the Timer task are declared inside this
-function then they must be declared static - otherwise they will be allocated on
-the stack and so not exists after this function exits. */
-	static StaticTask_t xTimerTaskTCB;
-	static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
-
-	/* Pass out a pointer to the StaticTask_t structure in which the Timer
-	task's state will be stored. */
-	*ppxTimerTaskTCBBuffer = &xTimerTaskTCB;
-
-	/* Pass out the array that will be used as the Timer task's stack. */
-	*ppxTimerTaskStackBuffer = uxTimerTaskStack;
-
-	/* Pass out the size of the array pointed to by *ppxTimerTaskStackBuffer.
-	Note that, as the array is necessarily of type StackType_t,
-	configMINIMAL_STACK_SIZE is specified in words, not bytes. */
-	*pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
-}
-/*-----------------------------------------------------------*/
-
 static void prvUARTInit(void)
 {
 	UART0_BAUDDIV = 16;
 	UART0_CTRL = 1;
 }
+
 /*-----------------------------------------------------------*/
 
 int __write(int iFile, char *pcString, int iStringLength)
@@ -396,18 +239,4 @@ int __write(int iFile, char *pcString, int iStringLength)
 	}
 
 	return iStringLength;
-}
-/*-----------------------------------------------------------*/
-
-void *malloc(size_t size)
-{
-	(void)size;
-
-	/* This project uses heap_4 so doesn't set up a heap for use by the C
-	library - but something is calling the C library malloc().  See
-	https://freertos.org/a00111.html for more information. */
-	printf("\r\n\r\nUnexpected call to malloc() - should be usine pvPortMalloc()\r\n");
-	portDISABLE_INTERRUPTS();
-	for (;;)
-		;
 }
