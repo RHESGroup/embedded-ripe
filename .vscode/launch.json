@@ -1,0 +1,40 @@
+{
+    "configurations": [
+        {
+            "name": "(gdb) Launch GDB-QEMU",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/output/ripe.elf",
+            "MIMode": "gdb",
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "miDebuggerPath": "/usr/bin/gdb-multiarch",
+            "miDebuggerServerAddress": "localhost:1234",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "(gdb) Launch GDB-Target",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/output/ripe.elf",
+            "MIMode": "gdb",
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "miDebuggerPath": "/usr/bin/gdb-multiarch",
+            "miDebuggerServerAddress": "localhost:4242",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}
