@@ -44,16 +44,17 @@ typedef struct UART_t
 } UART_t;
 
 /* Customized interrupt handlers. */
-extern void SVC_Handler(void);
+extern void main_SVC_Handler(void);
 
 /* FreeRTOS interrupt handlers. */
-// extern void vPortSVCHandler(void);
+extern void vPortSVCHandler(void);
 extern void xPortPendSVHandler(void);
 extern void xPortSysTickHandler(void);
 
 /* Exception handlers. */
 static void HardFault_Handler(void) __attribute__((naked));
 static void Default_Handler(void) __attribute__((naked));
+static void SVC_Handler(void) __attribute__((naked));
 void Reset_Handler(void);
 
 extern int main(void);
@@ -159,4 +160,26 @@ void HardFault_Handler(void)
         " ldr r2, handler2_address_const                            \n"
         " bx r2                                                     \n"
         " handler2_address_const: .word prvGetRegistersFromStack    \n");
+}
+
+void SVC_Handler(void)
+{
+    __asm volatile(
+		".align 8                   \n"
+		" b vPortSVCHandler         \n");
+	
+	// __asm volatile(
+	// 	".align 8                   \n"
+	// 	" tst lr, #4           		\n"
+	// 	" mrseq	r0, msp             \n"
+	// 	" mrsne	r0, psp             \n"
+	// 	" ldr		r0, [r0, #24]   \n"
+	// 	" ldrb	r0, [r0, #-2]       \n"
+	// 	" cmp	r0, #255            \n"
+	// 	" beq svc_end               \n"
+	// 	".svc_end                   \n"
+	// 	" beq svc_end               \n"
+	// 	" push {lr}                 \n"
+	// 	" blx r1                    \n"
+	// 	" pop {pc}                  \n");
 }

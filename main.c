@@ -39,6 +39,9 @@
 /* Macros */
 #define UNUSED_ARG(var) (var = var)
 
+/* Halt device */
+#define HALT_DEV() for (;;);
+
 /*
  * printf() output uses the UART.
  * These constants define the addresses of the required UART registers.
@@ -107,13 +110,13 @@ static void vUserEchoReceivedCommandTask(void *parameters)
 
 	UNUSED_ARG(parameters);
 
-	printf("DEVICE->ONLINE");
+	printf("DEVICE->ONLINE\n");
 	scanf("%s", serial_buffer);
 
 	if (strncmp("HOST->", (const char *)serial_buffer, 6) != 0)
 	{
-		printf("DEVICE->ERROR");
-		// maybe reset?
+		printf("DEVICE->ERROR\n");
+		HALT_DEV();
 	}
 
 	strncpy(attack_code, (const char *)(serial_buffer + 6), 4);
@@ -129,22 +132,9 @@ static void vUserEchoReceivedCommandTask(void *parameters)
 	printf("DEVICE->DONE");
 }
 
-void SVC_Handler(void)
+void main_SVC_Handler(void)
 {
-	// __asm volatile(
-	// 	".align 8                   \n"
-	// 	" tst lr            		\n"
-	// 	" mrseq	r0, msp             \n"
-	// 	" mrsne	r0, psp             \n"
-	// 	" ldr		r0, [r0, #24]   \n"
-	// 	" ldrb	r0, [r0, #-2]       \n"
-	// 	" cmp	r0, #255            \n"
-	// 	" beq svc_end               \n"
-	// 	".svc_end                   \n"
-	// 	" beq svc_end               \n"
-	// 	" push {lr}                 \n"
-	// 	" blx r1                    \n"
-	// 	" pop {pc}                  \n");
+	//
 }
 
 /*-----------------------------------------------------------*/
