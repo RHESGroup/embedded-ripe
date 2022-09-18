@@ -78,6 +78,7 @@ SECTIONS
         _data = .;
         _sdata = .;
         *(.data)
+        *(.data*)
         . = ALIGN(4);
         _edata = .;
     } >RAM AT> FLASH
@@ -88,6 +89,7 @@ SECTIONS
         _bss = .;
         _sbss = .;
         *(.bss)
+        *(.bss*)
         _ebss = .;
     } >RAM
     

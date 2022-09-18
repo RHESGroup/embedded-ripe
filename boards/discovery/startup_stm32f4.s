@@ -86,6 +86,20 @@ LoopForever:
 .size Reset_Handler, .-Reset_Handler
 
 /**
+ * @brief  This is the code that gets called when SVC get's called. This simply 
+ * 		   jumps to a user-defined handler.
+ *
+ * @param  None
+ * @retval : None
+*/
+    .section .text.SVC_Handler
+	.type SVC_Handler, %function
+SVC_Handler:
+  b vPortSVCHandler
+  .size SVC_Handler, .-SVC_Handler
+
+
+/**
  * @brief  This is the code that gets called when the processor receives an
  *         unexpected interrupt.  This simply enters an infinite loop, preserving
  *         the system state for examination by a debugger.
@@ -98,6 +112,7 @@ Default_Handler:
 Infinite_Loop:
   b Infinite_Loop
   .size Default_Handler, .-Default_Handler
+
 /******************************************************************************
 *
 * The STM32F407VGTx vector table.  Note that the proper constructs
@@ -240,9 +255,6 @@ isr_vector:
 
 	.weak	UsageFault_Handler
 	.thumb_set UsageFault_Handler,Default_Handler
-
-	.weak	SVC_Handler
-	.thumb_set SVC_Handler,Default_Handler
 
 	.weak	DebugMon_Handler
 	.thumb_set DebugMon_Handler,Default_Handler
