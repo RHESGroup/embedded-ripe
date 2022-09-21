@@ -35,28 +35,13 @@
 
 /* Local includes */
 #include "ripe.h"
+#include "uart.h"
 
 /* Macros */
 #define UNUSED_ARG(var) (var = var)
 
 /* Halt device */
 #define HALT_DEV() for (;;);
-
-/*
- * printf() output uses the UART.
- * These constants define the addresses of the required UART registers.
- */
-#define UART0_ADDRESS (0x40004400UL)
-#define UART0_DATA (*(((volatile uint32_t *)(UART0_ADDRESS + 4UL))))
-#define UART0_STATE (*(((volatile uint32_t *)(UART0_ADDRESS + 0UL))))
-#define UART0_CTRL (*(((volatile uint32_t *)(UART0_ADDRESS + 8UL))))
-#define UART0_BAUDDIV (*(((volatile uint32_t *)(UART0_ADDRESS + 16UL))))
-#define TX_BUFFER_MASK (1UL)
-
-/*
- * Printf() output is sent to the serial port.  Initialise the serial hardware.
- */
-static void prvUARTInit(void);
 
 /*-----------------------------------------------------------*/
 
@@ -75,7 +60,7 @@ static void vUserEchoReceivedCommandTask(void *parameters);
 void main(void)
 {
 	/* Hardware initialisation.  printf() output uses the UART for IO. */
-	prvUARTInit();
+	uart_init();
 
 	/* Print something just to check that everything works as expected */
 	printf("UART Initialized\r\n");
@@ -111,7 +96,10 @@ static void vUserEchoReceivedCommandTask(void *parameters)
 	UNUSED_ARG(parameters);
 
 	printf("DEVICE->ONLINE\n");
+	printf("$ ");
+
 	scanf("%s", serial_buffer);
+	printf("> %s\n", serial_buffer);
 
 	if (strncmp("HOST->", (const char *)serial_buffer, 6) != 0)
 	{
@@ -125,16 +113,19 @@ static void vUserEchoReceivedCommandTask(void *parameters)
 	// if the attack is not possible, send a nope
 
 	if (!attack_possible(&attack_params))
-		printf("DEVICE->NOPE");
+	{
+		printf("DEVICE->NOPE\n");
+	}
 	else
+	{
 		attack(&attack_params);
-
-	printf("DEVICE->DONE");
+		printf("DEVICE->DONE\n");
+	}
 }
 
 void main_SVC_Handler(void)
 {
-	//
+	printf("DEVICE->OK\n");
 }
 
 /*-----------------------------------------------------------*/
@@ -203,30 +194,3 @@ void vAssertCalled(const char *pcFileName, uint32_t ulLine)
 	taskEXIT_CRITICAL();
 }
 /*-----------------------------------------------------------*/
-
-static void prvUARTInit(void)
-{
-	UART0_BAUDDIV = 16;
-	UART0_CTRL = 1;
-}
-
-/*-----------------------------------------------------------*/
-
-int __write(int iFile, char *pcString, int iStringLength)
-{
-	int iNextChar;
-
-	/* Avoid compiler warnings about unused parameters. */
-	(void)iFile;
-
-	/* Output the formatted string to the UART. */
-	for (iNextChar = 0; iNextChar < iStringLength; iNextChar++)
-	{
-		while ((UART0_STATE & TX_BUFFER_MASK) != 0)
-			;
-		UART0_DATA = *pcString;
-		pcString++;
-	}
-
-	return iStringLength;
-}

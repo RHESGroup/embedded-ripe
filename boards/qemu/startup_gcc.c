@@ -166,20 +166,14 @@ void SVC_Handler(void)
 {
     __asm volatile(
 		".align 8                   \n"
-		" b vPortSVCHandler         \n");
-	
-	// __asm volatile(
-	// 	".align 8                   \n"
-	// 	" tst lr, #4           		\n"
-	// 	" mrseq	r0, msp             \n"
-	// 	" mrsne	r0, psp             \n"
-	// 	" ldr		r0, [r0, #24]   \n"
-	// 	" ldrb	r0, [r0, #-2]       \n"
-	// 	" cmp	r0, #255            \n"
-	// 	" beq svc_end               \n"
-	// 	".svc_end                   \n"
-	// 	" beq svc_end               \n"
-	// 	" push {lr}                 \n"
-	// 	" blx r1                    \n"
-	// 	" pop {pc}                  \n");
+        " tst   lr, #4           	\n"
+        " beq   vPortSVCHandler     \n"
+        " mrs	r0, psp             \n"
+	    " ldr	r1, [r0, #24]       \n"
+	    " ldr	r2, [r1, #-2]       \n"
+        " cmp	r2, #255            \n"
+        " bl    main_SVC_Handler    \n"
+	    " push  {lr}                \n"
+	    " blx   r1                  \n"
+	    " pop   {pc}                \n");
 }

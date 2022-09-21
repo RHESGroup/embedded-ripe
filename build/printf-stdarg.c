@@ -17,22 +17,38 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-/*
-	putchar is the only external dependency for this file,
-	if you have a working putchar, leave it commented out.
-	If not, uncomment the define below and
-	replace outbyte(c) by your own function call.
-
-*/
-
 #include <stdarg.h>
+#include <stdint.h>
+#include <stdlib.h>
 
-#define UART0_ADDRESS 	( 0x40004400UL )
-#define UART0_DATA		( * ( ( ( volatile unsigned int * )( UART0_ADDRESS + 4UL ) ) ) )
+#include "uart.h"
+
 #define putchar(c)      UART0_DATA = c
 #define getchar(c)		*c = UART0_DATA
 
-static int tiny_print( char **out, const char *format, va_list args, unsigned int buflen );
+// -------------------------------------------------------
+// PRIVATE UART SEND/RECV DEFINITIONS
+// -------------------------------------------------------
+
+inline static void prv_uart_getc(uint8_t* c)
+{
+	// wait till data register not empty
+	while(!(UART0_STATE & UART_SR_RXNE));
+	
+	getchar(c);
+}
+
+inline static void prv_uart_putc(uint8_t* c)
+{
+	putchar(*c);
+
+	// wait for transmit complete
+    while(!(UART0_STATE & UART_SR_TC));
+}
+
+// -------------------------------------------------------
+// PRINTF/SCANF UTILS
+// -------------------------------------------------------
 
 static void printchar(char **str, int c, char *buflimit)
 {
@@ -50,7 +66,7 @@ static void printchar(char **str, int c, char *buflimit)
 	}
 	else
 	{
-		putchar(c);
+		prv_uart_putc((uint8_t*)&c);
 	}
 }
 
@@ -133,6 +149,78 @@ static int printi(char **out, int i, int b, int sg, int width, int pad, int letb
 	return pc + prints (out, s, width, pad, buflimit);
 }
 
+static int tiny_scan (const char *format, va_list args)
+{
+    int i = 0, j = 0, ret = 0;
+    char buff[100] = {0}, c = 0;
+    char *out_loc;
+
+	do 
+	{
+		prv_uart_getc((uint8_t*)&c);
+		prv_uart_putc((uint8_t*)&c);        
+		buff[i] = c;
+		i++;
+	} while(c != '\0' && c != '\r' && c != '\n');
+
+	// terminate string
+	buff[i] = '\0';
+
+	i = 0;
+ 	while (format && format[i])
+ 	{
+ 	    if (format[i] == '%') 
+ 	    {
+			i++;
+ 	       	switch (format[i]) 
+ 	       	{
+ 	           	case 'c': 
+ 	           	{
+	 	           	*(char *)va_arg( args, char* ) = buff[j];
+	 	           	j++;
+	 	           	ret ++;
+	 	           	break;
+ 	           	}
+ 	           	case 'd': 
+ 	           	{
+	 	           	*(int *)va_arg( args, int* ) = strtol(&buff[j], &out_loc, 10);
+	 	           	j+=out_loc -&buff[j];
+	 	           	ret++;
+	 	           	break;
+ 	            }
+ 	            case 'x': 
+ 	            {
+	 	           	*(int *)va_arg( args, int* ) = strtol(&buff[j], &out_loc, 16);
+	 	           	j+=out_loc -&buff[j];
+	 	           	ret++;
+	 	           	break;
+ 	            }
+				case 's': 
+ 	            {
+					char* arg = (char *)va_arg( args, char* );
+					while (buff[j] != '\0')
+					{
+						*(arg++) = buff[j];
+	 	           		j++;
+	 	           		ret ++;
+					}
+					*(arg) = '\0';
+	 	           	break;
+ 	            }
+ 	        }
+ 	    } 
+ 	    else 
+ 	    {
+ 	        buff[j] = format[i];
+            j++;
+        }
+        i++;
+    }
+    
+	va_end(args);
+    return ret;
+}
+
 static int tiny_print( char **out, const char *format, va_list args, unsigned int buflen )
 {
 	register int width, pad;
@@ -206,6 +294,19 @@ static int tiny_print( char **out, const char *format, va_list args, unsigned in
 	return pc;
 }
 
+// -------------------------------------------------------
+// PUBLIC INTERFACES
+// -------------------------------------------------------
+
+int scanf(const char* format, ...)
+{
+		va_list args;
+
+		va_start( args, format );
+		return tiny_scan( format, args );
+
+}
+
 int printf(const char *format, ...)
 {
         va_list args;
@@ -233,81 +334,19 @@ int snprintf( char *buf, unsigned int count, const char *format, ... )
         return tiny_print( &buf, format, args, count );
 }
 
-
-#ifdef TEST_PRINTF
-int main(void)
-{
-	char *ptr = "Hello world!";
-	char *np = 0;
-	int i = 5;
-	unsigned int bs = sizeof(int)*8;
-	int mi;
-	char buf[80];
-
-	mi = (1 << (bs-1)) + 1;
-	printf("%s\n", ptr);
-	printf("printf test\n");
-	printf("%s is null pointer\n", np);
-	printf("%d = 5\n", i);
-	printf("%d = - max int\n", mi);
-	printf("char %c = 'a'\n", 'a');
-	printf("hex %x = ff\n", 0xff);
-	printf("hex %02x = 00\n", 0);
-	printf("signed %d = unsigned %u = hex %x\n", -3, -3, -3);
-	printf("%d %s(s)%", 0, "message");
-	printf("\n");
-	printf("%d %s(s) with %%\n", 0, "message");
-	sprintf(buf, "justif: \"%-10s\"\n", "left"); printf("%s", buf);
-	sprintf(buf, "justif: \"%10s\"\n", "right"); printf("%s", buf);
-	sprintf(buf, " 3: %04d zero padded\n", 3); printf("%s", buf);
-	sprintf(buf, " 3: %-4d left justif.\n", 3); printf("%s", buf);
-	sprintf(buf, " 3: %4d right justif.\n", 3); printf("%s", buf);
-	sprintf(buf, "-3: %04d zero padded\n", -3); printf("%s", buf);
-	sprintf(buf, "-3: %-4d left justif.\n", -3); printf("%s", buf);
-	sprintf(buf, "-3: %4d right justif.\n", -3); printf("%s", buf);
-
-	return 0;
-}
-
 /*
- * if you compile this file with
- *   gcc -Wall $(YOUR_C_OPTIONS) -DTEST_PRINTF -c printf.c
- * you will get a normal warning:
- *   printf.c:214: warning: spurious trailing `%' in format
- * this line is testing an invalid % at the end of the format string.
- *
- * this should display (on 32bit int machine) :
- *
- * Hello world!
- * printf test
- * (null) is null pointer
- * 5 = 5
- * -2147483647 = - max int
- * char a = 'a'
- * hex ff = ff
- * hex 00 = 00
- * signed -3 = unsigned 4294967293 = hex fffffffd
- * 0 message(s)
- * 0 message(s) with %
- * justif: "left      "
- * justif: "     right"
- *  3: 0003 zero padded
- *  3: 3    left justif.
- *  3:    3 right justif.
- * -3: -003 zero padded
- * -3: -3   left justif.
- * -3:   -3 right justif.
+ * Initialise the serial hardware.
  */
 
-#endif
-
-
-/* To keep linker happy. */
-int	write( int i, char* c, int n)
+void uart_init(void)
 {
-	(void)i;
-	(void)n;
-	(void)c;
-	return 0;
-}
+	UART0_BAUDDIV = 16;
+	UART0_BRR = 1;
 
+	// enable TX/RX
+	UART0_CR1 |= UART_CR1_TE;
+    UART0_CR1 |= UART_CR1_RE;
+
+	// enable UART 0
+	UART0_CR1 |= UART_CR1_UE;
+}
