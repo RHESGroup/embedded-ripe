@@ -1,4 +1,4 @@
-# embedded-ripe
+# Em-RIPE: The RIPE benchmark for ARM Microcontrollers
 
 This repository presents a novel version of the [RIPE benchmark](https://github.com/johnwilander/RIPE), thought for Microcontroller that runs [FreeRTOS](https://www.freertos.org/).
 
